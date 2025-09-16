@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Flappy Bird</title>
+    <style>
+        canvas {
+            border: 1px solid black;
+            display: block;
+            margin: 0 auto;
+            background: skyblue;
+        }
+        body {
+            text-align: center;
+            font-family: Arial, sans-serif;
+        }
+        #score {
+            font-size: 24px;
+            margin: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Flappy Bird</h1>
+    <div id="score">Score: 0</div>
+    <canvas id="game" width="400" height="600"></canvas>
+    <p>Нажмите пробел или кликните мышкой, чтобы прыгать</p>
+
+    <script>
+        const canvas = document.getElementById('game');
+        const ctx = canvas.getContext('2d');
+        const scoreElement = document.getElementById('score');
+        
+        // Параметры игры
+        const bird = {
+            x: 50,
+            y: canvas.height / 2,
+            radius: 15,
+            velocity: 0,
+            gravity: 0.5,
+            jump: -10,
+            color: 'yellow'
+        };
+        
+        const pipes = [];
+        const pipeWidth = 60;
+        const pipeGap = 150;
+        let pipeFrequency = 1500; // миллисекунды
+        let lastPipeTime = 0;
+        let score = 0;
+        let gameOver = false;
+        let gameStarted = false;
+        
+        // Управление
+        document.addEventListener('keydown', function(e) {
+            if (e.code === 'Space') {
+                jump();
+            }
+        });
+        
+        canvas.addEventListener('click', function() {
+            jump();
+        });
+        
+        function jump() {
+            if (!gameStarted) {
+                gameStarted = true;
+                resetGame();
+                gameLoop();
+            }
+            if (!gameOver) {
+                bird.velocity = bird.jump;
+            } else {
+                resetGame();
+                gameOver = false;
+            }
+        }
+        
+        function resetGame() {
+            bird.y = canvas.height / 2;
+            bird.velocity = 0;
+            pipes.length = 0;
+            score = 0;
+            scoreElement.textContent = 'Score: 0';
+            lastPipeTime = 0;
+        }
+        
+        function createPipe() {
+            const minHeight = 50;
+            const maxHeight = canvas.height - pipeGap - minHeight;
+            const height = Math.floor(Math.random() * (maxHeight - minHeight + 1)) + minHeight;
+            
+            pipes.push({
+                x: canvas.width,
+                height: height,
+                passed: false
+            });
+        }
+        
+        function update() {
+            if (gameOver) return;
+            
+            // Движение птицы
+            bird.velocity += bird.gravity;
+            bird.y += bird.velocity;
+            
+            // Проверка столкновений с землей и потолком
+            if (bird.y + bird.radius > canvas.height || bird.y - bird.radius < 0) {
+                gameOver = true;
+            }
+            
+            // Генерация труб
+            const now = Date.now();
+            if (now - lastPipeTime > pipeFrequency) {
+                createPipe();
+                lastPipeTime = now;
+            }
+            
+            // Движение труб и проверка столкновений
+            for (let i = pipes.length - 1; i >= 0; i--) {
+                pipes[i].x -= 2;
+                
+                // Проверка столкновения с трубой
+                if (
+                    bird.x + bird.radius > pipes[i].x &&
+                    bird.x - bird.radius < pipes[i].x + pipeWidth &&
+                    (bird.y - bird.radius < pipes[i].height || bird.y + bird.radius > pipes[i].height + pipeGap)
+                ) {
+                    gameOver = true;
+                }
+                
+                // Увеличение счета
+                if (!pipes[i].passed && bird.x > pipes[i].x + pipeWidth) {
+                    pipes[i].passed = true;
+                    score++;
+                    scoreElement.textContent = 'Score: ' + score;
+                    
+                    // Ускорение игры
+                    if (score % 5 === 0 && pipeFrequency > 800) {
+                        pipeFrequency -= 50;
+                    }
+                }
+                
+                // Удаление труб за пределами экрана
+                if (pipes[i].x + pipeWidth < 0) {
+                    pipes.splice(i, 1);
+                }
+            }
+        }
+        
+        function draw() {
+            // Очистка экрана
+            ctx.fillStyle = 'skyblue';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Рисование земли
+            ctx.fillStyle = 'green';
+            ctx.fillRect(0, canvas.height - 20, canvas.width, 20);
+            
+            // Рисование птицы
+            ctx.fillStyle = bird.color;
+            ctx.beginPath();
+            ctx.arc(bird.x, bird.y, bird.radius, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Рисование глаз
+            ctx.fillStyle = 'white';
+            ctx.beginPath();
+            ctx.arc(bird.x + 5, bird.y - 5, 3, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.fillStyle = 'black';
+            ctx.beginPath();
+            ctx.arc(bird.x + 5, bird.y - 5, 1, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Рисование труб
+            ctx.fillStyle = 'green';
+            for (const pipe of pipes) {
+                // Верхняя труба
+                ctx.fillRect(pipe.x, 0, pipeWidth, pipe.height);
+                // Нижняя труба
+                ctx.fillRect(pipe.x, pipe.height + pipeGap, pipeWidth, canvas.height - pipe.height - pipeGap);
+                
+                // Украшение труб
+                ctx.fillStyle = 'darkgreen';
+                // Верхняя труба
+                ctx.fillRect(pipe.x - 5, pipe.height - 20, pipeWidth + 10, 20);
+                // Нижняя труба
+                ctx.fillRect(pipe.x - 5, pipe.height + pipeGap, pipeWidth + 10, 20);
+                
+                ctx.fillStyle = 'green';
+            }
+            
+            // Сообщение о начале игры или конце
+            if (!gameStarted) {
+                ctx.fillStyle = 'black';
+                ctx.font = '30px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('Нажмите пробел или кликните', canvas.width / 2, canvas.height / 2 - 30);
+                ctx.fillText('чтобы начать', canvas.width / 2, canvas.height / 2 + 10);
+            }
+            
+            if (gameOver) {
+                ctx.fillStyle = 'black';
+                ctx.font = '30px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('Игра окончена!', canvas.width / 2, canvas.height / 2 - 30);
+                ctx.fillText('Нажмите пробел или кликните', canvas.width / 2, canvas.height / 2 + 10);
+                ctx.fillText('чтобы играть снова', canvas.width / 2, canvas.height / 2 + 50);
+            }
+        }
+        
+        function gameLoop() {
+            update();
+            draw();
+            
+            if (!gameOver) {
+                requestAnimationFrame(gameLoop);
+            }
+        }
+        
+        // Начальный экран
+        draw();
+    </script>
+</body>
+</html>
